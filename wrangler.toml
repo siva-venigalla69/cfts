@@ -1,0 +1,52 @@
+name = "design-gallery-backend"
+main = "src/index.ts"
+compatibility_date = "2024-01-15"
+compatibility_flags = ["nodejs_compat"]
+
+# Environment variables
+[vars]
+ENVIRONMENT = "development"
+JWT_SECRET = "your-super-secret-jwt-key-change-in-production"
+CORS_ORIGINS = "*"
+MAX_FILE_SIZE = "10485760"
+DEFAULT_PAGE_SIZE = "20"
+MAX_PAGE_SIZE = "100"
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "design-gallery-db"
+database_id = "your-d1-database-id"
+
+# R2 Storage binding for file uploads (if needed)
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "design-gallery-uploads"
+
+# KV namespace for caching (optional)
+[[kv_namespaces]]
+binding = "KV"
+id = "your-kv-namespace-id"
+preview_id = "your-preview-kv-namespace-id"
+
+# Production environment configuration
+[env.production]
+vars = { ENVIRONMENT = "production", CORS_ORIGINS = "https://yourdomain.com" }
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "design-gallery-db-prod"
+database_id = "your-production-d1-database-id"
+
+[[env.production.r2_buckets]]
+binding = "R2"
+bucket_name = "design-gallery-uploads-prod"
+
+# Development/preview environment
+[env.preview]
+vars = { ENVIRONMENT = "preview" }
+
+[[env.preview.d1_databases]]
+binding = "DB"
+database_name = "design-gallery-db-preview"
+database_id = "your-preview-d1-database-id" 

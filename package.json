@@ -1,0 +1,47 @@
+{
+  "name": "design-gallery-backend",
+  "version": "1.0.0",
+  "description": "Design Gallery Backend API built with Cloudflare Workers and Hono",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "build": "wrangler deploy --dry-run",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "db:migrate": "wrangler d1 migrations apply design-gallery-db",
+    "db:migrate:local": "wrangler d1 migrations apply design-gallery-db --local",
+    "db:studio": "wrangler d1 studio design-gallery-db",
+    "db:studio:local": "wrangler d1 studio design-gallery-db --local",
+    "generate:migration": "wrangler d1 migrations create design-gallery-db",
+    "lint": "eslint src/",
+    "format": "prettier --write src/"
+  },
+  "keywords": [
+    "cloudflare-workers",
+    "hono",
+    "design-gallery",
+    "api",
+    "d1",
+    "images"
+  ],
+  "author": "Design Gallery Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240129.0",
+    "@types/bcryptjs": "^2.4.6",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0",
+    "wrangler": "^3.28.0"
+  },
+  "dependencies": {
+    "hono": "^4.0.0",
+    "bcryptjs": "^2.4.3",
+    "jose": "^5.2.0",
+    "zod": "^3.22.0"
+  }
+} 
