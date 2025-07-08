@@ -147,3 +147,5 @@ config.local.js
 config.local.ts
 local.config.js
 local.config.ts 
+
+test-api.sh
