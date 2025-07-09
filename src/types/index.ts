@@ -66,6 +66,59 @@ export interface UserResponse {
   updated_at: string;
 }
 
+// Design Image types
+export interface DesignImage {
+  id: number;
+  design_id: number;
+  r2_object_key: string;
+  image_order: number;
+  is_primary: boolean;
+  alt_text?: string;
+  caption?: string;
+  image_type: 'standard' | 'thumbnail' | 'detail' | 'variant';
+  file_size?: number;
+  width?: number;
+  height?: number;
+  content_type?: string;
+  uploaded_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DesignImageCreate {
+  design_id: number;
+  r2_object_key: string;
+  image_order?: number;
+  is_primary?: boolean;
+  alt_text?: string;
+  caption?: string;
+  image_type?: 'standard' | 'thumbnail' | 'detail' | 'variant';
+  file_size?: number;
+  width?: number;
+  height?: number;
+  content_type?: string;
+  uploaded_by?: string;
+}
+
+export interface DesignImageResponse {
+  id: number;
+  design_id: number;
+  image_url: string;
+  r2_object_key: string;
+  image_order: number;
+  is_primary: boolean;
+  alt_text?: string;
+  caption?: string;
+  image_type: string;
+  file_size?: number;
+  width?: number;
+  height?: number;
+  content_type?: string;
+  uploaded_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 // Design types
 export interface Design {
   id: number;
@@ -73,7 +126,7 @@ export interface Design {
   description?: string;
   short_description?: string;
   long_description?: string;
-  r2_object_key: string;
+  r2_object_key: string; // Kept for backward compatibility, will contain primary image
   design_number?: string; // Customer-facing design number for orders
   category: string;
   style?: string;
@@ -141,8 +194,9 @@ export interface DesignResponse {
   description?: string;
   short_description?: string;
   long_description?: string;
-  image_url: string;
-  r2_object_key: string;
+  image_url: string; // Primary image URL (backward compatibility)
+  images: DesignImageResponse[]; // Array of all images
+  r2_object_key: string; // Primary image R2 key (backward compatibility)
   design_number?: string; // Customer-facing design number for orders
   category: string;
   style?: string;
@@ -269,6 +323,24 @@ export interface ImageUploadResponse {
   public_url: string;
   message: string;
   success: boolean;
+}
+
+export interface BatchImageUploadResponse {
+  uploaded_images: ImageUploadResponse[];
+  failed_uploads: { filename: string; error: string }[];
+  total_uploaded: number;
+  total_failed: number;
+  success: boolean;
+  message: string;
+}
+
+export interface DesignImageUploadData {
+  file: File;
+  image_order?: number;
+  is_primary?: boolean;
+  alt_text?: string;
+  caption?: string;
+  image_type?: 'standard' | 'thumbnail' | 'detail' | 'variant';
 }
 
 export interface PresignedUrlResponse {

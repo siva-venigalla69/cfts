@@ -134,8 +134,9 @@ static generateDesignNumber(filename: string, category: string = 'general'): str
  * Validate design number format
  */
 static isValidDesignNumber(designNumber: string): boolean {
-  // Valid formats: DGN-001, SAR-123, LEH-456, etc.
-  const pattern = /^[A-Z]{2,4}-\d{3,4}$/
+  // Valid formats: DGN-001, SAR-123, LEH-456, D003, etc.
+  // Allow both formats: "ABC-123" and "A123" or "AB123"
+  const pattern = /^[A-Z]{1,4}(-?)\d{3,4}$/
   return pattern.test(designNumber)
 }
 }
@@ -301,15 +302,19 @@ export class DatabaseUtils {
         if (key === 'q') {
           // Search query across multiple fields
           conditions.push(`(
-            designname LIKE ? OR 
+            title LIKE ? OR 
+            description LIKE ? OR
             short_description LIKE ? OR 
             long_description LIKE ? OR 
             style LIKE ? OR 
             colour LIKE ? OR 
-            categories LIKE ?
+            tags LIKE ? OR
+            design_number LIKE ? OR
+            designer_name LIKE ? OR
+            collection_name LIKE ?
           )`)
           const searchTerm = `%${value}%`
-          params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm)
+          params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm)
         } else {
           conditions.push(`${key} = ?`)
           params.push(value)
@@ -325,7 +330,7 @@ export class DatabaseUtils {
    * Build SQL ORDER BY clause
    */
   static buildOrderByClause(sortBy?: string, sortOrder?: 'asc' | 'desc'): string {
-    const allowedSortFields = ['created_at', 'view_count', 'like_count', 'designname']
+    const allowedSortFields = ['created_at', 'view_count', 'like_count', 'title', 'design_number']
     const field = allowedSortFields.includes(sortBy || '') ? sortBy : 'created_at'
     const order = sortOrder === 'asc' ? 'ASC' : 'DESC'
     

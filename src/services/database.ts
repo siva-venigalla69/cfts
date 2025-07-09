@@ -5,6 +5,9 @@ import type {
   UserFavorite,
   UserResponse,
   DesignResponse,
+  DesignImage,
+  DesignImageCreate,
+  DesignImageResponse,
   UserCreate,
   UserLogin,
   DesignCreate,
@@ -71,6 +74,30 @@ function validateDesign(result: Record<string, unknown>): Design {
     designer_name: result.designer_name as string || undefined,
     collection_name: result.collection_name as string || undefined,
     season: result.season as string || undefined,
+    created_at: result.created_at as string,
+    updated_at: result.updated_at as string
+  }
+}
+
+function validateDesignImage(result: Record<string, unknown>): DesignImage {
+  if (!result.id || !result.design_id || !result.r2_object_key) {
+    throw new ValidationError('Invalid design image data from database')
+  }
+  
+  return {
+    id: result.id as number,
+    design_id: result.design_id as number,
+    r2_object_key: result.r2_object_key as string,
+    image_order: (result.image_order as number) || 0,
+    is_primary: Boolean(result.is_primary),
+    alt_text: result.alt_text as string || undefined,
+    caption: result.caption as string || undefined,
+    image_type: (result.image_type as any) || 'standard',
+    file_size: result.file_size as number || undefined,
+    width: result.width as number || undefined,
+    height: result.height as number || undefined,
+    content_type: result.content_type as string || undefined,
+    uploaded_by: result.uploaded_by as string || undefined,
     created_at: result.created_at as string,
     updated_at: result.updated_at as string
   }
@@ -603,6 +630,236 @@ export class DatabaseService {
       }
     } catch (error) {
       console.error('Error getting user favorites:', error)
+      throw error
+    }
+  }
+
+  // ============================================================================
+  // DESIGN IMAGES OPERATIONS
+  // ============================================================================
+
+  /**
+   * Add image to design
+   */
+  async addDesignImage(imageData: DesignImageCreate): Promise<DesignImage> {
+    try {
+      // Check if design exists
+      const design = await this.db.prepare('SELECT id FROM designs WHERE id = ?').bind(imageData.design_id).first()
+      if (!design) {
+        throw new NotFoundError('Design not found')
+      }
+
+      // Check max images per design
+      const imageCount = await this.db.prepare(`
+        SELECT COUNT(*) as count FROM design_images WHERE design_id = ?
+      `).bind(imageData.design_id).first()
+      
+      const maxImages = 10 // Default max images per design
+      if ((imageCount as any)?.count >= maxImages) {
+        throw new ValidationError(`Maximum ${maxImages} images per design allowed`)
+      }
+
+      // If this is set as primary, un-primary other images
+      if (imageData.is_primary) {
+        await this.db.prepare(`
+          UPDATE design_images SET is_primary = 0 WHERE design_id = ?
+        `).bind(imageData.design_id).run()
+      }
+
+      const result = await this.db.prepare(`
+        INSERT INTO design_images (
+          design_id, r2_object_key, image_order, is_primary, alt_text,
+          caption, image_type, file_size, width, height, content_type, uploaded_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        RETURNING *
+      `).bind(
+        imageData.design_id,
+        imageData.r2_object_key,
+        imageData.image_order || 0,
+        imageData.is_primary ? 1 : 0,
+        imageData.alt_text || null,
+        imageData.caption || null,
+        imageData.image_type || 'standard',
+        imageData.file_size || null,
+        imageData.width || null,
+        imageData.height || null,
+        imageData.content_type || null,
+        imageData.uploaded_by || null
+      ).first()
+
+      if (!result) {
+        throw new Error('Failed to add design image')
+      }
+
+      return validateDesignImage(result)
+    } catch (error) {
+      console.error('Error adding design image:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Get all images for a design
+   */
+  async getDesignImages(designId: number): Promise<DesignImageResponse[]> {
+    try {
+      const images = await this.db.prepare(`
+        SELECT * FROM design_images 
+        WHERE design_id = ? 
+        ORDER BY is_primary DESC, image_order ASC, created_at ASC
+      `).bind(designId).all()
+
+      return images.results.map((image: any) => {
+        const imageUrls = this.config.getAllImageUrls(image.r2_object_key)
+        return {
+          ...validateDesignImage(image),
+          image_url: imageUrls.original
+        }
+      })
+    } catch (error) {
+      console.error('Error getting design images:', error)
+      return []
+    }
+  }
+
+  /**
+   * Update design image
+   */
+  async updateDesignImage(imageId: number, updates: Partial<DesignImageCreate>): Promise<DesignImage> {
+    try {
+      // Check if image exists
+      const existingImage = await this.db.prepare('SELECT * FROM design_images WHERE id = ?').bind(imageId).first()
+      if (!existingImage) {
+        throw new NotFoundError('Design image not found')
+      }
+
+      // If setting as primary, un-primary other images in the same design
+      if (updates.is_primary) {
+        await this.db.prepare(`
+          UPDATE design_images SET is_primary = 0 WHERE design_id = ?
+        `).bind((existingImage as any).design_id).run()
+      }
+
+      // Build dynamic update query
+      const setFields: string[] = []
+      const values: any[] = []
+
+      if (updates.image_order !== undefined) {
+        setFields.push('image_order = ?')
+        values.push(updates.image_order)
+      }
+
+      if (updates.is_primary !== undefined) {
+        setFields.push('is_primary = ?')
+        values.push(updates.is_primary ? 1 : 0)
+      }
+
+      if (updates.alt_text !== undefined) {
+        setFields.push('alt_text = ?')
+        values.push(updates.alt_text)
+      }
+
+      if (updates.caption !== undefined) {
+        setFields.push('caption = ?')
+        values.push(updates.caption)
+      }
+
+      if (updates.image_type !== undefined) {
+        setFields.push('image_type = ?')
+        values.push(updates.image_type)
+      }
+
+      if (setFields.length === 0) {
+        return validateDesignImage(existingImage) // No updates to make
+      }
+
+      values.push(imageId) // For WHERE clause
+
+      const result = await this.db.prepare(`
+        UPDATE design_images 
+        SET ${setFields.join(', ')}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        RETURNING *
+      `).bind(...values).first()
+
+      if (!result) {
+        throw new Error('Failed to update design image')
+      }
+
+      return validateDesignImage(result)
+    } catch (error) {
+      console.error('Error updating design image:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Delete design image
+   */
+  async deleteDesignImage(imageId: number): Promise<void> {
+    try {
+      const image = await this.db.prepare('SELECT * FROM design_images WHERE id = ?').bind(imageId).first()
+      if (!image) {
+        throw new NotFoundError('Design image not found')
+      }
+
+      await this.db.prepare('DELETE FROM design_images WHERE id = ?').bind(imageId).run()
+    } catch (error) {
+      console.error('Error deleting design image:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Set primary image for design
+   */
+  async setPrimaryImage(designId: number, imageId: number): Promise<void> {
+    try {
+      // Verify image belongs to design
+      const image = await this.db.prepare(`
+        SELECT id FROM design_images WHERE id = ? AND design_id = ?
+      `).bind(imageId, designId).first()
+      
+      if (!image) {
+        throw new NotFoundError('Design image not found')
+      }
+
+      // Un-primary all images for this design
+      await this.db.prepare(`
+        UPDATE design_images SET is_primary = 0 WHERE design_id = ?
+      `).bind(designId).run()
+
+      // Set the specified image as primary
+      await this.db.prepare(`
+        UPDATE design_images SET is_primary = 1 WHERE id = ?
+      `).bind(imageId).run()
+    } catch (error) {
+      console.error('Error setting primary image:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Reorder design images
+   */
+  async reorderDesignImages(designId: number, imageOrders: { imageId: number; order: number }[]): Promise<void> {
+    try {
+      // Verify design exists
+      const design = await this.db.prepare('SELECT id FROM designs WHERE id = ?').bind(designId).first()
+      if (!design) {
+        throw new NotFoundError('Design not found')
+      }
+
+      // Update each image order
+      for (const { imageId, order } of imageOrders) {
+        await this.db.prepare(`
+          UPDATE design_images 
+          SET image_order = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND design_id = ?
+        `).bind(order, imageId, designId).run()
+      }
+    } catch (error) {
+      console.error('Error reordering design images:', error)
       throw error
     }
   }
