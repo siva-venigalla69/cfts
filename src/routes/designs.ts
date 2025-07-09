@@ -173,9 +173,38 @@ app.get('/', authMiddleware, async (c) => {
       .bind(...params, validLimit, offset)
       .all()
     
-    const designs = designsResult.results?.map((design: any) => 
-      formatDesignResponse(design, env)
-    ) || []
+    // Get images for all designs
+    const designs = await Promise.all(
+      designsResult.results?.map(async (design: any) => {
+        // Get images for this design
+        const images = await env.DB.prepare(`
+          SELECT * FROM design_images 
+          WHERE design_id = ? 
+          ORDER BY is_primary DESC, image_order ASC, created_at ASC
+        `).bind(design.id).all()
+        
+        const imageResponses: DesignImageResponse[] = images.results?.map((image: any) => ({
+          id: image.id,
+          design_id: image.design_id,
+          image_url: getR2PublicUrl(image.r2_object_key, env),
+          r2_object_key: image.r2_object_key,
+          image_order: image.image_order,
+          is_primary: Boolean(image.is_primary),
+          alt_text: image.alt_text,
+          caption: image.caption,
+          image_type: image.image_type,
+          file_size: image.file_size,
+          width: image.width,
+          height: image.height,
+          content_type: image.content_type,
+          uploaded_by: image.uploaded_by,
+          created_at: image.created_at,
+          updated_at: image.updated_at
+        })) || []
+        
+        return formatDesignResponse(design, env, imageResponses)
+      }) || []
+    )
     
     const response: DesignListResponse = {
       designs,
@@ -258,7 +287,33 @@ app.get('/:id', authMiddleware, async (c) => {
     // Update view count in response
     design.view_count = ((design.view_count as number) || 0) + 1
     
-    const response = formatDesignResponse(design, env)
+    // Get all images for this design
+    const images = await env.DB.prepare(`
+      SELECT * FROM design_images 
+      WHERE design_id = ? 
+      ORDER BY is_primary DESC, image_order ASC, created_at ASC
+    `).bind(designId).all()
+    
+    const imageResponses: DesignImageResponse[] = images.results?.map((image: any) => ({
+      id: image.id,
+      design_id: image.design_id,
+      image_url: getR2PublicUrl(image.r2_object_key, env),
+      r2_object_key: image.r2_object_key,
+      image_order: image.image_order,
+      is_primary: Boolean(image.is_primary),
+      alt_text: image.alt_text,
+      caption: image.caption,
+      image_type: image.image_type,
+      file_size: image.file_size,
+      width: image.width,
+      height: image.height,
+      content_type: image.content_type,
+      uploaded_by: image.uploaded_by,
+      created_at: image.created_at,
+      updated_at: image.updated_at
+    })) || []
+    
+    const response = formatDesignResponse(design, env, imageResponses)
     
     return c.json(ResponseUtils.success(response, 'Design retrieved successfully'))
     
