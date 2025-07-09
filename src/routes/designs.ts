@@ -148,7 +148,7 @@ app.get('/', authMiddleware, async (c) => {
     const total = countResult?.count || 0
     
     // Calculate pagination
-    const total_pages = Math.ceil(total / validLimit)
+    const total_pages = Math.ceil((total as number) / validLimit)
     const offset = (validPage - 1) * validLimit
     
     // Validate sort parameters
@@ -175,7 +175,7 @@ app.get('/', authMiddleware, async (c) => {
     
     const response: DesignListResponse = {
       designs,
-      total,
+      total: total as number,
       page: validPage,
       per_page: validLimit,
       total_pages
@@ -252,7 +252,7 @@ app.get('/:id', authMiddleware, async (c) => {
       .run()
     
     // Update view count in response
-    design.view_count = (design.view_count || 0) + 1
+    design.view_count = ((design.view_count as number) || 0) + 1
     
     const response = formatDesignResponse(design, env)
     
@@ -619,10 +619,10 @@ app.get('/user/favorites', authMiddleware, async (c) => {
     
     const response: DesignListResponse = {
       designs,
-      total,
+      total: total as number,
       page: validPage,
       per_page: validLimit,
-      total_pages: Math.ceil(total / validLimit)
+      total_pages: Math.ceil((total as number) / validLimit)
     }
     
     return c.json(ResponseUtils.success(response, 'User favorites retrieved successfully'))

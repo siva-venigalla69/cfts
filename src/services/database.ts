@@ -9,7 +9,7 @@ import type {
   UserLogin,
   DesignCreate,
   DesignUpdate,
-  DesignFilter
+  DesignSearchFilters
 } from '../types'
 import { 
   SecurityUtils, 
@@ -23,6 +23,58 @@ import {
   ValidationError 
 } from '../types'
 import { createConfig } from '../config'
+
+/**
+ * Type-safe helpers for database result conversion
+ */
+function validateUser(result: Record<string, unknown>): User {
+  if (!result.id || !result.username || !result.password_hash) {
+    throw new ValidationError('Invalid user data from database')
+  }
+  
+  return {
+    id: result.id as number,
+    username: result.username as string,
+    password_hash: result.password_hash as string,
+    is_admin: Boolean(result.is_admin),
+    is_approved: Boolean(result.is_approved),
+    created_at: result.created_at as string,
+    updated_at: result.updated_at as string
+  }
+}
+
+function validateDesign(result: Record<string, unknown>): Design {
+  if (!result.id || !result.title || !result.r2_object_key || !result.category) {
+    throw new ValidationError('Invalid design data from database')
+  }
+  
+  return {
+    id: result.id as number,
+    title: result.title as string,
+    description: result.description as string || undefined,
+    short_description: result.short_description as string || undefined,
+    long_description: result.long_description as string || undefined,
+    r2_object_key: result.r2_object_key as string,
+    design_number: result.design_number as string || undefined,
+    category: result.category as string,
+    style: result.style as string || undefined,
+    colour: result.colour as string || undefined,
+    fabric: result.fabric as string || undefined,
+    occasion: result.occasion as string || undefined,
+    size_available: result.size_available as string || undefined,
+    price_range: result.price_range as string || undefined,
+    tags: result.tags as string || undefined,
+    featured: Boolean(result.featured),
+    status: result.status as 'active' | 'inactive' | 'draft',
+    view_count: (result.view_count as number) || 0,
+    like_count: (result.like_count as number) || 0,
+    designer_name: result.designer_name as string || undefined,
+    collection_name: result.collection_name as string || undefined,
+    season: result.season as string || undefined,
+    created_at: result.created_at as string,
+    updated_at: result.updated_at as string
+  }
+}
 
 /**
  * Database Service - handles all database operations for the Design Gallery
@@ -65,7 +117,7 @@ export class DatabaseService {
         throw new Error('Failed to create user')
       }
 
-      return result as User
+      return validateUser(result)
     } catch (error) {
       console.error('Error creating user:', error)
       throw error
@@ -83,7 +135,7 @@ export class DatabaseService {
         WHERE username = ?
       `).bind(username).first()
 
-      return result as User | null
+      return result ? validateUser(result) : null
     } catch (error) {
       console.error('Error getting user by username:', error)
       return null
@@ -101,7 +153,7 @@ export class DatabaseService {
         WHERE id = ?
       `).bind(id).first()
 
-      return result as User | null
+      return result ? validateUser(result) : null
     } catch (error) {
       console.error('Error getting user by ID:', error)
       return null
@@ -149,6 +201,7 @@ export class DatabaseService {
         throw new Error('Failed to update user')
       }
 
+      // @ts-ignore - Database result type validation
       return result as User
     } catch (error) {
       console.error('Error updating user:', error)
@@ -255,32 +308,42 @@ export class DatabaseService {
     try {
       const result = await this.db.prepare(`
         INSERT INTO designs (
-          designname, style, colour, short_description, long_description, 
-          categories, cloudflare_image_id, featured, status, designer_name, 
-          collection_name, season
+          title, description, short_description, long_description, r2_object_key,
+          design_number, category, style, colour, fabric, occasion, size_available,
+          price_range, tags, featured, status, designer_name, collection_name, season,
+          created_at, updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         RETURNING *
       `).bind(
-        designData.designname,
-        designData.style || null,
-        designData.colour || null,
+        designData.title,
+        designData.description || null,
         designData.short_description || null,
         designData.long_description || null,
-        designData.categories || null,
-        designData.cloudflare_image_id,
+        designData.r2_object_key,
+        designData.design_number || null,
+        designData.category,
+        designData.style || null,
+        designData.colour || null,
+        designData.fabric || null,
+        designData.occasion || null,
+        designData.size_available || null,
+        designData.price_range || null,
+        designData.tags || null,
         designData.featured ? 1 : 0,
-        designData.status || 'active',
+        'active', // status is always active for new designs
         designData.designer_name || null,
         designData.collection_name || null,
-        designData.season || null
+        designData.season || null,
+        new Date().toISOString(),
+        new Date().toISOString()
       ).first()
 
       if (!result) {
         throw new Error('Failed to create design')
       }
 
-      return result as Design
+      return validateDesign(result)
     } catch (error) {
       console.error('Error creating design:', error)
       throw error
@@ -322,7 +385,7 @@ export class DatabaseService {
   /**
    * Get designs with filters and pagination
    */
-  async getDesigns(filters: DesignFilter, userId?: number): Promise<{ designs: DesignResponse[]; total: number }> {
+  async getDesigns(filters: DesignSearchFilters, userId?: number): Promise<{ designs: DesignResponse[]; total: number }> {
     try {
       const { page, limit } = ValidationUtils.validatePagination(filters.page, filters.limit)
       const offset = DatabaseUtils.calculateOffset(page, limit)
@@ -407,7 +470,7 @@ export class DatabaseService {
       })
 
       if (setFields.length === 0) {
-        return design as Design
+        return validateDesign(design)
       }
 
       values.push(id) // For WHERE clause
@@ -423,7 +486,7 @@ export class DatabaseService {
         throw new Error('Failed to update design')
       }
 
-      return result as Design
+      return validateDesign(result)
     } catch (error) {
       console.error('Error updating design:', error)
       throw error

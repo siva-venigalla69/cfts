@@ -1,5 +1,12 @@
 import { z } from 'zod'
 
+// Declare module augmentation for Hono context variables
+declare module 'hono' {
+  interface ContextVariableMap {
+    user: JWTPayload
+  }
+}
+
 // Environment bindings for Cloudflare Workers
 export interface Env {
   DB: D1Database;
@@ -13,6 +20,9 @@ export interface Env {
   MAX_FILE_SIZE?: string;
   DEFAULT_PAGE_SIZE?: string;
   MAX_PAGE_SIZE?: string;
+  // Optional environment variables referenced in config
+  CLOUDFLARE_API_TOKEN?: string;
+  CLOUDFLARE_IMAGES_TOKEN?: string;
 }
 
 // User types
@@ -174,6 +184,11 @@ export interface DesignSearchFilters {
   collection_name?: string;
   season?: string;
   status?: string;
+  // Pagination and sorting properties
+  page?: number;
+  limit?: number;
+  sort_by?: string;
+  sort_order?: 'asc' | 'desc';
 }
 
 // User favorites types
@@ -275,6 +290,7 @@ export interface JWTPayload {
   user_id: number;
   username: string;
   is_admin: boolean;
+  is_approved: boolean;
   iat?: number;
   exp?: number;
 }

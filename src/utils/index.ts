@@ -64,8 +64,22 @@ export class SecurityUtils {
 
       const { payload } = await jwtVerify(token, secretKey)
       
-      return payload as TokenData
+      // Validate and convert payload to TokenData format
+      if (!payload.user_id || !payload.username) {
+        throw new AuthenticationError('Invalid token payload')
+      }
+
+      return {
+        user_id: payload.user_id as number,
+        username: payload.username as string,
+        is_admin: payload.is_admin as boolean,
+        is_approved: payload.is_approved as boolean,
+        exp: payload.exp as number
+      }
     } catch (error) {
+      if (error instanceof AuthenticationError) {
+        throw error
+      }
       throw new AuthenticationError('Invalid or expired token')
     }
   }
@@ -175,8 +189,7 @@ export class ResponseUtils {
         pages,
         has_next: page < pages,
         has_prev: page > 1
-      },
-      timestamp: new Date().toISOString()
+      }
     }
   }
 

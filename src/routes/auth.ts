@@ -67,7 +67,8 @@ auth.post('/login', zValidator('json', UserLoginSchema), async (c) => {
     const tokenPayload = {
       user_id: user.id,
       username: user.username,
-      is_admin: Boolean(user.is_admin)
+      is_admin: Boolean(user.is_admin),
+      is_approved: Boolean(user.is_approved)
     }
 
     const accessToken = await SecurityUtils.createJWT(
@@ -195,7 +196,8 @@ auth.post('/refresh', authMiddleware, async (c) => {
     const tokenPayload = {
       user_id: userData.id,
       username: userData.username,
-      is_admin: Boolean(userData.is_admin)
+      is_admin: Boolean(userData.is_admin),
+      is_approved: Boolean(userData.is_approved)
     }
 
     const accessToken = await SecurityUtils.createJWT(

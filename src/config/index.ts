@@ -77,14 +77,12 @@ export class Config {
     return this.env.DB
   }
 
-  // R2 Storage binding (optional)
-  get r2Storage(): R2Bucket | undefined {
-    return this.env.R2
-  }
-
-  // KV namespace binding (optional)
-  get kvNamespace(): KVNamespace | undefined {
-    return this.env.KV
+  // R2 Storage binding
+  get r2Storage(): R2Bucket {
+    if (!this.env.R2_BUCKET) {
+      throw new Error('R2 Bucket binding (R2_BUCKET) is not configured')
+    }
+    return this.env.R2_BUCKET
   }
 
   // Cloudflare Images configuration
@@ -153,8 +151,7 @@ export class Config {
       maxFileSize: this.maxFileSize,
       defaultPageSize: this.defaultPageSize,
       maxPageSize: this.maxPageSize,
-      hasR2Storage: !!this.env.R2,
-      hasKVNamespace: !!this.env.KV,
+      hasR2Storage: !!this.env.R2_BUCKET,
       hasCloudflareConfig: !!(this.cloudflareAccountId && this.cloudflareApiToken)
     }
   }

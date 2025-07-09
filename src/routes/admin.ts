@@ -80,7 +80,7 @@ app.get('/users', authMiddleware, adminMiddleware, async (c) => {
       total,
       page: validPage,
       per_page: validLimit,
-      total_pages: Math.ceil(total / validLimit)
+      total_pages: Math.ceil((total as number) / validLimit)
     }
     
     return c.json(ResponseUtils.success(response, 'Users retrieved successfully'))

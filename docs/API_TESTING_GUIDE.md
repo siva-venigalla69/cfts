@@ -1,610 +1,668 @@
-# 🧪 **Complete API Testing Guide**
+# Design Gallery API Testing Guide
 
-## 🌍 **Understanding Cloudflare Environments**
+## Overview
+Comprehensive testing guide for the Design Gallery Backend API with all endpoints, authentication flows, and data operations.
 
-### **Environment Overview**
+## Base URL and Environment
 ```
-┌─────────────┬─────────────────┬─────────────────────────────┬─────────────────────┐
-│ Environment │ Purpose         │ URL Pattern                 │ Database            │
-├─────────────┼─────────────────┼─────────────────────────────┼─────────────────────┤
-│ Development │ Daily testing   │ design-gallery-backend.*.dev│ design-gallery-db   │
-│ Preview     │ Staging/testing │ *.pages.dev or custom       │ design-gallery-db-  │
-│             │                 │                             │ preview             │
-│ Production  │ Live users      │ your-domain.com             │ design-gallery-db-  │
-│             │                 │                             │ prod                │
-└─────────────┴─────────────────┴─────────────────────────────┴─────────────────────┘
+Production: https://design-gallery-backend.your-domain.com
+Development: http://localhost:8787
 ```
 
-### **Why Use Different Environments?**
-- **Development**: Test new features without breaking production
-- **Preview**: Final testing before production deployment  
-- **Production**: Live application serving real users
+## Authentication
 
----
+### 1. User Registration
+**Endpoint:** `POST /api/auth/register`
 
-## 🚀 **Setup and Deployment Commands**
-
-### **1. Deploy to Different Environments**
-
-```bash
-# Deploy to development (default)
-wrangler deploy
-
-# Deploy to preview environment
-wrangler deploy --env preview
-
-# Deploy to production
-wrangler deploy --env production
-```
-
-### **2. Database Operations**
-
-```bash
-# Apply migrations to remote databases
-wrangler d1 migrations apply design-gallery-db --remote                    # Development
-wrangler d1 migrations apply design-gallery-db-preview --env preview --remote  # Preview
-wrangler d1 migrations apply design-gallery-db-prod --env production --remote  # Production
-
-# Check database status
-wrangler d1 execute design-gallery-db --remote --command "SELECT name FROM sqlite_master WHERE type='table';"
-```
-
-### **3. Secret Management**
-
-```bash
-# Set secrets for each environment
-wrangler secret put JWT_SECRET                    # Development
-wrangler secret put JWT_SECRET --env preview     # Preview  
-wrangler secret put JWT_SECRET --env production  # Production
-
-# List secrets
-wrangler secret list
-wrangler secret list --env production
-```
-
----
-
-## 🔧 **API Testing Setup**
-
-### **Base URLs for Testing**
-
-```bash
-# Get your deployment URLs
-wrangler deployments list                    # Development
-wrangler deployments list --env preview     # Preview
-wrangler deployments list --env production  # Production
-
-# Example URLs (replace with your actual URLs)
-DEV_URL="https://design-gallery-backend.your-account.workers.dev"
-PREVIEW_URL="https://design-gallery-backend-preview.your-account.workers.dev"  
-PROD_URL="https://your-domain.com"
-```
-
-### **Testing Environment Variables**
-
-```bash
-# Set your testing environment
-export API_BASE_URL="https://design-gallery-backend.your-account.workers.dev"
-export ADMIN_TOKEN=""  # You'll get this after login
-export USER_TOKEN=""   # You'll get this after user login
-```
-
----
-
-## 🔐 **Authentication Testing**
-
-### **1. Create First Admin User**
-
-```bash
-# Connect to remote database and create admin user
-wrangler d1 execute design-gallery-db --remote --command "
-INSERT INTO users (username, password_hash, is_admin, is_approved, created_at, updated_at) 
-VALUES (
-  'admin', 
-  '\$2a\$12\$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewKyNiVSOPKz3.t6', 
-  1, 
-  1, 
-  datetime('now'), 
-  datetime('now')
-);"
-
-# This creates an admin user with:
-# Username: admin
-# Password: password123
-```
-
-### **2. Test Admin Login**
-
-```bash
-# Login as admin
-curl -X POST "$API_BASE_URL/api/auth/login" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "admin",
-    "password": "password123"
-  }'
-
-# Expected response:
+**Request:**
+```json
 {
-  "success": true,
-  "message": "Login successful",
-  "data": {
-    "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
-    "token_type": "bearer",
-    "expires_in": 86400,
-    "user": {
-      "id": 1,
-      "username": "admin",
-      "is_admin": true,
-      "is_approved": true
-    }
-  }
+  "username": "testuser",
+  "password": "securepassword123"
 }
-
-# Save the token for subsequent requests
-export ADMIN_TOKEN="eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
 ```
 
-### **3. Test User Registration**
-
-```bash
-# Register a new user
-curl -X POST "$API_BASE_URL/api/auth/register" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "testuser",
-    "password": "testpassword123"
-  }'
-
-# Expected response:
+**Response (201):**
+```json
 {
   "success": true,
   "message": "Registration successful! Please wait for admin approval.",
   "data": {
-    "id": 2,
+    "id": 1,
     "username": "testuser",
     "is_admin": false,
+    "is_approved": false,
+    "created_at": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+### 2. User Login
+**Endpoint:** `POST /api/auth/login`
+
+**Request:**
+```json
+{
+  "username": "testuser",
+  "password": "securepassword123"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Login successful",
+  "data": {
+    "user": {
+      "id": 1,
+      "username": "testuser",
+      "is_admin": false,
+      "is_approved": true
+    },
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }
+}
+```
+
+### 3. Get Current User Profile
+**Endpoint:** `GET /api/auth/me`
+**Auth Required:** Bearer Token
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "User profile retrieved successfully",
+  "data": {
+    "id": 1,
+    "username": "testuser",
+    "is_admin": false,
+    "is_approved": true,
+    "created_at": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+## Design Management
+
+### 4. List Designs (Public)
+**Endpoint:** `GET /api/designs`
+
+**Query Parameters:**
+- `page` (default: 1)
+- `limit` (default: 20, max: 100)
+- `category` - Filter by category
+- `featured` - true/false for featured designs
+- `search` - Search in title, description, tags
+- `design_number` - Search by design number
+- `sort_by` - created_at, title, view_count, like_count, design_number, category, style
+- `sort_order` - asc, desc (default: desc)
+
+**Example Request:**
+```
+GET /api/designs?page=1&limit=10&category=saree&featured=true&search=silk&sort_by=created_at&sort_order=desc
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Designs retrieved successfully",
+  "data": [
+    {
+      "id": 1,
+      "title": "Elegant Silk Saree",
+      "description": "Beautiful traditional silk saree",
+      "design_number": "SAR001",
+      "category": "saree",
+      "style": "traditional",
+      "colour": "red",
+      "fabric": "silk",
+      "featured": true,
+      "status": "active",
+      "view_count": 150,
+      "like_count": 25,
+      "image_url": "https://r2-public-url/designs/12345.jpg",
+      "created_at": "2024-01-15T10:30:00Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 10,
+    "total": 100,
+    "total_pages": 10,
+    "has_next": true,
+    "has_prev": false
+  }
+}
+```
+
+### 5. Get Single Design
+**Endpoint:** `GET /api/designs/{id}`
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Design retrieved successfully",
+  "data": {
+    "id": 1,
+    "title": "Elegant Silk Saree",
+    "description": "Beautiful traditional silk saree",
+    "short_description": "Elegant silk saree",
+    "long_description": "This beautiful traditional silk saree...",
+    "design_number": "SAR001",
+    "category": "saree",
+    "style": "traditional",
+    "colour": "red",
+    "fabric": "silk",
+    "occasion": "wedding",
+    "size_available": "Free Size",
+    "price_range": "5000-8000",
+    "tags": "silk,traditional,wedding",
+    "featured": true,
+    "status": "active",
+    "view_count": 151,
+    "like_count": 25,
+    "designer_name": "Designer Name",
+    "collection_name": "Collection 2024",
+    "season": "Winter",
+    "image_url": "https://r2-public-url/designs/12345.jpg",
+    "created_at": "2024-01-15T10:30:00Z",
+    "updated_at": "2024-01-15T11:30:00Z"
+  }
+}
+```
+
+## User Favorites
+
+### 6. Add to Favorites
+**Endpoint:** `POST /api/designs/{id}/favorite`
+**Auth Required:** Bearer Token
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Design added to favorites",
+  "data": {
+    "is_favorite": true
+  }
+}
+```
+
+### 7. Remove from Favorites
+**Endpoint:** `DELETE /api/designs/{id}/favorite`
+**Auth Required:** Bearer Token
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Design removed from favorites",
+  "data": {
+    "is_favorite": false
+  }
+}
+```
+
+### 8. Get User Favorites
+**Endpoint:** `GET /api/designs/favorites`
+**Auth Required:** Bearer Token
+
+**Query Parameters:**
+- `page` (default: 1)
+- `limit` (default: 20)
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Favorite designs retrieved successfully",
+  "data": [
+    {
+      "id": 1,
+      "title": "Elegant Silk Saree",
+      "design_number": "SAR001",
+      "category": "saree",
+      "image_url": "https://r2-public-url/designs/12345.jpg",
+      "created_at": "2024-01-15T10:30:00Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 5,
+    "total_pages": 1,
+    "has_next": false,
+    "has_prev": false
+  }
+}
+```
+
+## Shopping Cart
+
+### 9. Get Cart
+**Endpoint:** `GET /api/cart`
+**Auth Required:** Bearer Token
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Cart retrieved successfully",
+  "data": {
+    "cart_id": 1,
+    "items": [
+      {
+        "id": 1,
+        "design_id": 1,
+        "quantity": 2,
+        "notes": "Please confirm availability",
+        "design": {
+          "id": 1,
+          "title": "Elegant Silk Saree",
+          "design_number": "SAR001",
+          "category": "saree",
+          "image_url": "https://r2-public-url/designs/12345.jpg"
+        },
+        "created_at": "2024-01-15T10:30:00Z",
+        "updated_at": "2024-01-15T11:30:00Z"
+      }
+    ],
+    "total_items": 1,
+    "total_quantity": 2,
+    "created_at": "2024-01-15T10:00:00Z",
+    "updated_at": "2024-01-15T11:30:00Z"
+  }
+}
+```
+
+### 10. Add Item to Cart
+**Endpoint:** `POST /api/cart/items`
+**Auth Required:** Bearer Token
+
+**Request:**
+```json
+{
+  "design_id": 1,
+  "quantity": 2,
+  "notes": "Please confirm availability in red color"
+}
+```
+
+**Response (201):**
+```json
+{
+  "success": true,
+  "message": "Item added to cart successfully",
+  "data": {
+    "item_id": 1,
+    "design_id": 1,
+    "quantity": 2,
+    "notes": "Please confirm availability in red color"
+  }
+}
+```
+
+### 11. Update Cart Item
+**Endpoint:** `PUT /api/cart/items/{item_id}`
+**Auth Required:** Bearer Token
+
+**Request:**
+```json
+{
+  "quantity": 3,
+  "notes": "Updated notes"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Cart item updated successfully",
+  "data": {
+    "item_id": 1,
+    "quantity": 3,
+    "notes": "Updated notes"
+  }
+}
+```
+
+### 12. Remove Cart Item
+**Endpoint:** `DELETE /api/cart/items/{item_id}`
+**Auth Required:** Bearer Token
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Item removed from cart successfully"
+}
+```
+
+### 13. Clear Cart
+**Endpoint:** `DELETE /api/cart`
+**Auth Required:** Bearer Token
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Cart cleared successfully"
+}
+```
+
+## WhatsApp Sharing
+
+### 14. Share Cart via WhatsApp
+**Endpoint:** `POST /api/cart/share`
+**Auth Required:** Bearer Token
+
+**Request:**
+```json
+{
+  "contact_index": 0,
+  "message": "Hi! I'm interested in these designs. Please let me know availability and pricing."
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "WhatsApp share link generated successfully",
+  "data": {
+    "whatsapp_url": "https://wa.me/919876543210?text=Hi%21%20I%27m%20interested...",
+    "contact_number": "+919876543210",
+    "design_count": 3,
+    "message": "Hi! I'm interested in these designs..."
+  }
+}
+```
+
+## Admin Endpoints
+
+### 15. Get All Users (Admin)
+**Endpoint:** `GET /api/admin/users`
+**Auth Required:** Bearer Token (Admin)
+
+**Query Parameters:**
+- `page` (default: 1)
+- `limit` (default: 20)
+- `approved` - true/false filter
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Users retrieved successfully",
+  "data": [
+    {
+      "id": 1,
+      "username": "testuser",
+      "is_admin": false,
+      "is_approved": true,
+      "created_at": "2024-01-15T10:30:00Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 50,
+    "total_pages": 3,
+    "has_next": true,
+    "has_prev": false
+  }
+}
+```
+
+### 16. Approve User (Admin)
+**Endpoint:** `POST /api/admin/users/{user_id}/approve`
+**Auth Required:** Bearer Token (Admin)
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "User approved successfully",
+  "data": {
+    "user_id": 1,
+    "is_approved": true
+  }
+}
+```
+
+### 17. Revoke User Access (Admin)
+**Endpoint:** `POST /api/admin/users/{user_id}/revoke`
+**Auth Required:** Bearer Token (Admin)
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "User access revoked successfully",
+  "data": {
+    "user_id": 1,
     "is_approved": false
   }
 }
 ```
 
-### **4. Test Token Validation**
+## File Upload
 
-```bash
-# Check if token is valid
-curl -X GET "$API_BASE_URL/api/auth/check" \
-  -H "Authorization: Bearer $ADMIN_TOKEN"
+### 18. Upload Design Image (Admin)
+**Endpoint:** `POST /api/upload/design`
+**Auth Required:** Bearer Token (Admin)
+**Content-Type:** `multipart/form-data`
 
-# Get current user profile
-curl -X GET "$API_BASE_URL/api/auth/me" \
-  -H "Authorization: Bearer $ADMIN_TOKEN"
+**Request:**
+```
+FormData:
+- file: [image file]
+- title: "Elegant Silk Saree"
+- description: "Beautiful traditional design"
+- design_number: "SAR001"
+- category: "saree"
+- style: "traditional"
+- colour: "red"
+- fabric: "silk"
 ```
 
----
-
-## 🎨 **Design Management Testing**
-
-### **1. Create a Design (Admin Only)**
-
-```bash
-# Create a new design
-curl -X POST "$API_BASE_URL/api/designs" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
-  -d '{
-    "title": "Elegant Red Saree",
-    "description": "Beautiful traditional red saree with gold border",
-    "short_description": "Red saree with gold border",
-    "r2_object_key": "sarees/2024/01/elegant-red-saree.jpg",
-    "category": "sarees",
-    "style": "Traditional",
-    "colour": "Red",
-    "fabric": "Silk",
-    "occasion": "Wedding",
-    "featured": true
-  }'
-```
-
-### **2. List Designs (Public)**
-
-```bash
-# Get all designs
-curl -X GET "$API_BASE_URL/api/designs"
-
-# Get designs with filters
-curl -X GET "$API_BASE_URL/api/designs?category=sarees&style=Traditional&page=1&per_page=10"
-
-# Get featured designs only
-curl -X GET "$API_BASE_URL/api/designs/featured"
-```
-
-### **3. Get Single Design**
-
-```bash
-# Get design by ID (increments view count)
-curl -X GET "$API_BASE_URL/api/designs/1"
-```
-
-### **4. Update Design (Admin Only)**
-
-```bash
-# Update a design
-curl -X PUT "$API_BASE_URL/api/designs/1" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
-  -d '{
-    "title": "Updated Elegant Red Saree",
-    "featured": false,
-    "status": "active"
-  }'
-```
-
-### **5. Delete Design (Admin Only)**
-
-```bash
-# Delete a design
-curl -X DELETE "$API_BASE_URL/api/designs/1" \
-  -H "Authorization: Bearer $ADMIN_TOKEN"
-```
-
----
-
-## 📸 **Image Upload Testing**
-
-### **1. Upload Image (Admin Only)**
-
-```bash
-# Upload an image file
-curl -X POST "$API_BASE_URL/api/upload/image" \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
-  -F "file=@/path/to/your/image.jpg" \
-  -F "category=sarees"
-
-# Expected response:
+**Response (201):**
+```json
 {
   "success": true,
-  "message": "Image uploaded successfully",
+  "message": "Design uploaded successfully",
   "data": {
-    "object_key": "sarees/2024/01/20240101_12345678.jpg",
-    "public_url": "https://pub-0b3de96b3a72833e38311290e9acfc3a.r2.dev/sarees/2024/01/20240101_12345678.jpg"
+    "design_id": 1,
+    "title": "Elegant Silk Saree",
+    "design_number": "SAR001",
+    "image_url": "https://r2-public-url/designs/12345.jpg",
+    "r2_object_key": "designs/12345.jpg"
   }
 }
 ```
 
-### **2. List Uploaded Images**
+## Error Responses
 
-```bash
-# List all images
-curl -X GET "$API_BASE_URL/api/upload/images" \
-  -H "Authorization: Bearer $ADMIN_TOKEN"
+### Common Error Formats
 
-# List images with prefix filter
-curl -X GET "$API_BASE_URL/api/upload/images?prefix=sarees/&limit=20" \
-  -H "Authorization: Bearer $ADMIN_TOKEN"
-```
-
-### **3. Get Image Information**
-
-```bash
-# Get image metadata
-curl -X GET "$API_BASE_URL/api/upload/image/sarees/2024/01/image.jpg/info" \
-  -H "Authorization: Bearer $ADMIN_TOKEN"
-```
-
-### **4. Delete Image**
-
-```bash
-# Delete an image
-curl -X DELETE "$API_BASE_URL/api/upload/image/sarees/2024/01/image.jpg" \
-  -H "Authorization: Bearer $ADMIN_TOKEN"
-```
-
----
-
-## 👑 **Admin Panel Testing**
-
-### **1. User Management**
-
-```bash
-# List all users
-curl -X GET "$API_BASE_URL/api/admin/users" \
-  -H "Authorization: Bearer $ADMIN_TOKEN"
-
-# Get pending user approvals
-curl -X GET "$API_BASE_URL/api/admin/users/pending" \
-  -H "Authorization: Bearer $ADMIN_TOKEN"
-
-# Approve a user
-curl -X POST "$API_BASE_URL/api/admin/users/2/approve" \
-  -H "Authorization: Bearer $ADMIN_TOKEN"
-
-# Reject a user
-curl -X POST "$API_BASE_URL/api/admin/users/2/reject" \
-  -H "Authorization: Bearer $ADMIN_TOKEN"
-
-# Toggle admin privileges
-curl -X POST "$API_BASE_URL/api/admin/users/2/toggle-admin" \
-  -H "Authorization: Bearer $ADMIN_TOKEN"
-
-# Delete a user
-curl -X DELETE "$API_BASE_URL/api/admin/users/2" \
-  -H "Authorization: Bearer $ADMIN_TOKEN"
-```
-
-### **2. Bulk Operations**
-
-```bash
-# Bulk approve users
-curl -X POST "$API_BASE_URL/api/admin/users/bulk-approve" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
-  -d '{
-    "user_ids": [2, 3, 4]
-  }'
-```
-
-### **3. System Statistics**
-
-```bash
-# Get system stats
-curl -X GET "$API_BASE_URL/api/admin/stats" \
-  -H "Authorization: Bearer $ADMIN_TOKEN"
-```
-
-### **4. App Settings**
-
-```bash
-# Get all settings
-curl -X GET "$API_BASE_URL/api/admin/settings" \
-  -H "Authorization: Bearer $ADMIN_TOKEN"
-
-# Update a setting
-curl -X PUT "$API_BASE_URL/api/admin/settings/site_name" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
-  -d '{
-    "value": "My Design Gallery"
-  }'
-```
-
----
-
-## 💎 **User Features Testing**
-
-### **1. Favorites System (Authenticated Users)**
-
-```bash
-# Login as regular user first (after approval)
-curl -X POST "$API_BASE_URL/api/auth/login" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "testuser",
-    "password": "testpassword123"
-  }'
-
-export USER_TOKEN="user_jwt_token_here"
-
-# Add design to favorites
-curl -X POST "$API_BASE_URL/api/designs/1/favorite" \
-  -H "Authorization: Bearer $USER_TOKEN"
-
-# Remove from favorites  
-curl -X DELETE "$API_BASE_URL/api/designs/1/favorite" \
-  -H "Authorization: Bearer $USER_TOKEN"
-
-# Get user's favorites
-curl -X GET "$API_BASE_URL/api/designs/user/favorites" \
-  -H "Authorization: Bearer $USER_TOKEN"
-```
-
----
-
-## 🏥 **Health Checks and Monitoring**
-
-### **1. API Health Check**
-
-```bash
-# Check API health
-curl -X GET "$API_BASE_URL/health"
-
-# Expected response:
+**400 Bad Request:**
+```json
 {
-  "success": true,
-  "message": "Health check completed",
-  "data": {
-    "status": "healthy",
-    "services": {
-      "database": "healthy",
-      "r2_storage": "healthy"
-    },
-    "timestamp": "2024-01-01T00:00:00Z"
-  }
+  "success": false,
+  "message": "Invalid request data",
+  "error": "VALIDATION_ERROR"
 }
 ```
 
-### **2. R2 Storage Health Check**
-
-```bash
-# Check R2 storage connectivity
-curl -X GET "$API_BASE_URL/api/upload/health"
+**401 Unauthorized:**
+```json
+{
+  "success": false,
+  "message": "Authentication required",
+  "error": "AUTHENTICATION_ERROR"
+}
 ```
 
----
-
-## 🧪 **Testing Scripts**
-
-### **Complete Test Script**
-
-```bash
-#!/bin/bash
-
-# API Testing Script
-API_BASE_URL="https://design-gallery-backend.your-account.workers.dev"
-
-echo "🧪 Starting API Tests..."
-
-# 1. Health Check
-echo "1. Testing Health Check..."
-curl -s "$API_BASE_URL/health" | jq .
-
-# 2. Admin Login
-echo "2. Testing Admin Login..."
-ADMIN_RESPONSE=$(curl -s -X POST "$API_BASE_URL/api/auth/login" \
-  -H "Content-Type: application/json" \
-  -d '{"username": "admin", "password": "password123"}')
-
-ADMIN_TOKEN=$(echo $ADMIN_RESPONSE | jq -r '.data.access_token')
-echo "Admin Token: ${ADMIN_TOKEN:0:20}..."
-
-# 3. Create Design
-echo "3. Testing Design Creation..."
-curl -s -X POST "$API_BASE_URL/api/designs" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
-  -d '{
-    "title": "Test Saree",
-    "description": "Test description",
-    "r2_object_key": "test/saree.jpg",
-    "category": "sarees"
-  }' | jq .
-
-# 4. List Designs
-echo "4. Testing Design Listing..."
-curl -s "$API_BASE_URL/api/designs" | jq .
-
-echo "✅ API Tests Completed!"
+**403 Forbidden:**
+```json
+{
+  "success": false,
+  "message": "Insufficient permissions",
+  "error": "AUTHORIZATION_ERROR"
+}
 ```
 
-### **Performance Testing**
-
-```bash
-# Load testing with ab (Apache Bench)
-ab -n 100 -c 10 "$API_BASE_URL/api/designs"
-
-# Load testing with curl
-for i in {1..10}; do
-  curl -s "$API_BASE_URL/health" > /dev/null &
-done
-wait
-echo "Parallel requests completed"
+**404 Not Found:**
+```json
+{
+  "success": false,
+  "message": "Resource not found",
+  "error": "NOT_FOUND"
+}
 ```
 
----
-
-## ⚠️ **Common Testing Issues & Solutions**
-
-### **1. Authentication Errors**
-```bash
-# Problem: 401 Unauthorized
-# Solution: Check token format and expiration
-curl -X GET "$API_BASE_URL/api/auth/check" \
-  -H "Authorization: Bearer $TOKEN"
+**409 Conflict:**
+```json
+{
+  "success": false,
+  "message": "Username already exists",
+  "error": "CONFLICT"
+}
 ```
 
-### **2. CORS Issues**
-```bash
-# Problem: CORS errors in browser
-# Solution: Check CORS_ORIGINS in wrangler.toml
-# For development: CORS_ORIGINS = "*"
-# For production: CORS_ORIGINS = "https://yourdomain.com"
+**429 Rate Limited:**
+```json
+{
+  "success": false,
+  "message": "Rate limit exceeded. Please try again later.",
+  "error": "RATE_LIMIT_EXCEEDED"
+}
 ```
 
-### **3. Database Connection Issues**
-```bash
-# Problem: Database errors
-# Solution: Check database ID and apply migrations
-wrangler d1 migrations apply design-gallery-db --remote
+**500 Internal Server Error:**
+```json
+{
+  "success": false,
+  "message": "Internal server error",
+  "error": "INTERNAL_ERROR"
+}
 ```
 
-### **4. File Upload Issues**
+## Testing Scenarios
+
+### 1. Complete User Journey
+1. Register new user
+2. Wait for admin approval
+3. Login with approved user
+4. Browse designs with filters
+5. Add designs to favorites
+6. Add designs to cart
+7. Share cart via WhatsApp
+
+### 2. Admin Workflow
+1. Login as admin
+2. View pending user approvals
+3. Approve users
+4. Upload new designs
+5. Manage app settings
+
+### 3. Cart Management
+1. Add multiple items to cart
+2. Update quantities and notes
+3. Remove specific items
+4. Share via WhatsApp
+5. Clear entire cart
+
+### 4. Search and Filter Testing
+1. Search by text in various fields
+2. Filter by category, style, color
+3. Sort by different criteria
+4. Test pagination
+5. Search by design number
+
+## Performance Testing
+
+### Load Testing Endpoints
+- `GET /api/designs` (most frequently accessed)
+- `POST /api/auth/login` (authentication bottleneck)
+- `GET /api/cart` (user-specific data)
+- `POST /api/cart/items` (write operations)
+
+### Expected Response Times
+- Authentication: < 500ms
+- Design listing: < 300ms
+- Single design: < 200ms
+- Cart operations: < 400ms
+- File upload: < 2000ms
+
+## Security Testing
+
+### Authentication Tests
+1. Test with invalid tokens
+2. Test with expired tokens
+3. Test admin-only endpoints with regular user
+4. Test rate limiting
+
+### Input Validation Tests
+1. SQL injection attempts in search
+2. XSS attempts in text fields
+3. File upload validation
+4. Large payload handling
+
+## Automated Testing Script
+
+Use the provided test script:
 ```bash
-# Problem: File upload fails
-# Solution: Check R2 bucket exists and is configured
-wrangler r2 bucket list
+chmod +x scripts/test-new-features.sh
+./scripts/test-new-features.sh
 ```
 
----
+This script tests:
+- User registration and login
+- Design browsing and search
+- Cart operations
+- WhatsApp sharing
+- Admin functions
+- Error handling
 
-## 📊 **Monitoring and Logs**
+## Configuration for Testing
 
-### **View Real-time Logs**
-
+### Environment Variables
 ```bash
-# Tail development logs
-wrangler tail
+# Development
+export JWT_SECRET="your-secret-key-here"
+export ENVIRONMENT="development"
+export R2_PUBLIC_URL="your-r2-public-url"
 
-# Tail production logs
-wrangler tail --env production
-
-# Filter logs
-wrangler tail --format pretty
+# Database
+wrangler d1 execute design-gallery-db --file=migrations/0001_initial.sql
+wrangler d1 execute design-gallery-db --file=migrations/0002_add_design_number.sql
+wrangler d1 execute design-gallery-db --file=migrations/0003_add_shopping_cart.sql
 ```
 
-### **Analytics and Metrics**
+### Admin User Setup
+1. Update admin password hash in migration
+2. Or create admin via API after deployment
 
-```bash
-# Get deployment info
-wrangler deployments list
+## Monitoring and Logs
 
-# Get worker info
-wrangler whoami
+### Key Metrics to Monitor
+- Response times per endpoint
+- Error rates by endpoint
+- Authentication success/failure rates
+- Cart conversion rates
+- File upload success rates
+
+### Log Examples
+```
+[2024-01-15T10:30:00Z] POST /api/auth/login - 200 - 245ms - IP: 192.168.1.1
+[2024-01-15T10:30:15Z] GET /api/designs?page=1 - 200 - 187ms - IP: 192.168.1.1
+[2024-01-15T10:30:30Z] POST /api/cart/items - 201 - 312ms - IP: 192.168.1.1
 ```
 
----
-
-## 🎯 **Testing Checklist**
-
-### **✅ Basic Functionality**
-- [ ] Health check returns 200
-- [ ] Admin can login and get JWT token
-- [ ] New users can register
-- [ ] Admin can approve/reject users
-- [ ] Designs can be created, read, updated, deleted
-- [ ] Images can be uploaded to R2
-- [ ] Favorites system works
-
-### **✅ Security Testing**
-- [ ] Unauthenticated requests return 401
-- [ ] Non-admin users cannot access admin endpoints
-- [ ] JWT tokens expire correctly
-- [ ] Input validation works
-- [ ] Rate limiting functions (if enabled)
-
-### **✅ Performance Testing**
-- [ ] API responds under 500ms for simple requests
-- [ ] Database queries are optimized
-- [ ] File uploads complete successfully
-- [ ] Concurrent requests handled properly
-
-### **✅ Error Handling**
-- [ ] Invalid JSON returns 400
-- [ ] Missing resources return 404
-- [ ] Server errors return 500 with proper messages
-- [ ] Validation errors provide clear feedback
-
----
-
-## 🚀 **Production Deployment Checklist**
-
-### **Before Production Deploy**
-- [ ] All tests pass in preview environment
-- [ ] Database migrations applied
-- [ ] Production secrets configured
-- [ ] Custom domain configured (optional)
-- [ ] CORS settings updated for production
-- [ ] Rate limiting configured
-- [ ] Error monitoring setup
-
-### **After Production Deploy**
-- [ ] Health check passes
-- [ ] Admin login works
-- [ ] Key user journeys tested
-- [ ] Performance monitoring active
-- [ ] Backup procedures documented
-
----
-
-**🎉 Your API is now ready for comprehensive testing!**
-
-Use this guide to test all functionality across development, preview, and production environments. Each environment serves a specific purpose in your development workflow. 
+This comprehensive testing guide ensures thorough validation of all API functionality before production deployment. 

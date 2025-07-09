@@ -217,13 +217,17 @@ app.post('/items', authMiddleware, async (c) => {
     }
     
     // Check if design is already in cart
+    if (!cart) {
+      return c.json(ResponseUtils.error('Failed to create or access cart'), 500)
+    }
+
     const existingItem = await env.DB.prepare(
       'SELECT * FROM cart_items WHERE cart_id = ? AND design_id = ?'
     ).bind(cart.id, body.design_id).first()
     
     if (existingItem) {
       // Update quantity
-      const newQuantity = existingItem.quantity + quantity
+      const newQuantity = (existingItem.quantity as number) + quantity
       if (newQuantity > 10) {
         return c.json(ResponseUtils.error('Maximum quantity per design is 10'), 400)
       }
@@ -432,8 +436,8 @@ app.post('/share', authMiddleware, async (c) => {
       'SELECT value FROM app_settings WHERE key = ?'
     ).bind('whatsapp_message_template').first()
     
-    const contactNumbers = whatsappNumbers?.value || '+919876543210'
-    const template = messageTemplate?.value || 'Hi! I found these beautiful designs in the gallery. Please check them out: {design_list}'
+    const contactNumbers = (whatsappNumbers?.value as string) || '+919876543210'
+    const template = (messageTemplate?.value as string) || 'Hi! I found these beautiful designs in the gallery. Please check them out: {design_list}'
     
     // Get design details
     const designsQuery = `
