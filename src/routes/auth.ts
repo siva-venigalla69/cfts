@@ -220,4 +220,5 @@ auth.post('/refresh', authMiddleware, async (c) => {
   }
 })
 
-export { auth } 
+export { auth }
+export default auth 

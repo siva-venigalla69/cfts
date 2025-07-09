@@ -1,11 +1,18 @@
+import { z } from 'zod'
+
 // Environment bindings for Cloudflare Workers
 export interface Env {
   DB: D1Database;
   R2_BUCKET: R2Bucket;
+  // KV?: KVNamespace; // Removed - not required for basic functionality
   JWT_SECRET: string;
   CLOUDFLARE_ACCOUNT_ID: string;
   R2_PUBLIC_URL: string;
   ENVIRONMENT: string;
+  CORS_ORIGINS?: string;
+  MAX_FILE_SIZE?: string;
+  DEFAULT_PAGE_SIZE?: string;
+  MAX_PAGE_SIZE?: string;
 }
 
 // User types
@@ -29,6 +36,17 @@ export interface UserLogin {
   password: string;
 }
 
+// Validation schemas
+export const UserCreateSchema = z.object({
+  username: z.string().min(3).max(50),
+  password: z.string().min(6).max(100)
+})
+
+export const UserLoginSchema = z.object({
+  username: z.string().min(1),
+  password: z.string().min(1)
+})
+
 export interface UserResponse {
   id: number;
   username: string;
@@ -46,6 +64,7 @@ export interface Design {
   short_description?: string;
   long_description?: string;
   r2_object_key: string;
+  design_number?: string; // Customer-facing design number for orders
   category: string;
   style?: string;
   colour?: string;
@@ -71,6 +90,7 @@ export interface DesignCreate {
   short_description?: string;
   long_description?: string;
   r2_object_key: string;
+  design_number?: string; // Optional - will be auto-generated if not provided
   category: string;
   style?: string;
   colour?: string;
@@ -113,6 +133,7 @@ export interface DesignResponse {
   long_description?: string;
   image_url: string;
   r2_object_key: string;
+  design_number?: string; // Customer-facing design number for orders
   category: string;
   style?: string;
   colour?: string;
@@ -142,6 +163,7 @@ export interface DesignListResponse {
 
 export interface DesignSearchFilters {
   q?: string;
+  design_number?: string; // Search by design number
   category?: string;
   style?: string;
   colour?: string;
@@ -160,6 +182,60 @@ export interface UserFavorite {
   user_id: number;
   design_id: number;
   created_at: string;
+}
+
+// Shopping cart types
+export interface UserCart {
+  id: number;
+  user_id: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CartItem {
+  id: number;
+  cart_id: number;
+  design_id: number;
+  quantity: number;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CartItemWithDesign extends CartItem {
+  design: DesignResponse;
+}
+
+export interface CartResponse {
+  id: number;
+  user_id: number;
+  items: CartItemWithDesign[];
+  total_items: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AddToCartRequest {
+  design_id: number;
+  quantity?: number;
+  notes?: string;
+}
+
+export interface UpdateCartItemRequest {
+  quantity?: number;
+  notes?: string;
+}
+
+// WhatsApp sharing types
+export interface WhatsAppShareRequest {
+  design_ids: number[];
+  message?: string;
+}
+
+export interface WhatsAppShareResponse {
+  share_url: string;
+  message: string;
+  design_count: number;
 }
 
 // App settings types
@@ -193,6 +269,14 @@ export interface TokenData {
   is_admin: boolean;
   is_approved: boolean;
   exp: number;
+}
+
+export interface JWTPayload {
+  user_id: number;
+  username: string;
+  is_admin: boolean;
+  iat?: number;
+  exp?: number;
 }
 
 export interface AuthResponse {

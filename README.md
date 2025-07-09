@@ -100,23 +100,39 @@ docs/
 
 2. **Configure environment variables** in `wrangler.toml`:
    ```toml
-   [env.development.vars]
-   JWT_SECRET = "your-super-secret-jwt-key"
+   # Environment variables (non-sensitive only)
+   [vars]
    ENVIRONMENT = "development"
+   # JWT_SECRET is stored as a Cloudflare secret - not here!
+   CORS_ORIGINS = "*"
+   MAX_FILE_SIZE = "10485760"
    R2_PUBLIC_URL = "https://your-r2-domain.com"
    CLOUDFLARE_ACCOUNT_ID = "your-cloudflare-account-id"
 
-   [[env.development.d1_databases]]
+   [[d1_databases]]
    binding = "DB"
    database_name = "design-gallery-db"
    database_id = "your-d1-database-id"
 
-   [[env.development.r2_buckets]]
+   [[r2_buckets]]
    binding = "R2_BUCKET"
    bucket_name = "design-gallery-images"
    ```
 
-3. **Set up the database**:
+3. **Set up Cloudflare secrets** (never store in wrangler.toml):
+   ```bash
+   # Set JWT secret as a Cloudflare secret
+   wrangler secret put JWT_SECRET
+   # When prompted, paste your secure JWT secret
+   
+   # For production environment
+   wrangler secret put JWT_SECRET --env production
+   
+   # Verify secrets are set
+   wrangler secret list
+   ```
+
+4. **Set up the database**:
    ```bash
    # Create D1 database
    wrangler d1 create design-gallery-db
@@ -128,12 +144,12 @@ docs/
    npm run db:studio:local
    ```
 
-4. **Create R2 bucket**:
+5. **Create R2 bucket**:
    ```bash
    wrangler r2 bucket create design-gallery-images
    ```
 
-5. **Start development server**:
+6. **Start development server**:
    ```bash
    npm run dev
    ```
@@ -251,10 +267,28 @@ wrangler deploy --env production
 ### Environment Configuration
 Configure production environment in `wrangler.toml`:
 ```toml
-[env.production.vars]
-JWT_SECRET = "production-secret-key"
-ENVIRONMENT = "production"
-R2_PUBLIC_URL = "https://your-production-domain.com"
+[env.production]
+vars = { 
+  ENVIRONMENT = "production", 
+  CORS_ORIGINS = "https://yourdomain.com",
+  R2_PUBLIC_URL = "https://your-production-domain.com",
+  CLOUDFLARE_ACCOUNT_ID = "your-cloudflare-account-id"
+}
+# JWT_SECRET for production is stored as a Cloudflare secret
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "design-gallery-db-prod"
+database_id = "your-production-database-id"
+
+[[env.production.r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "design-gallery-images-prod"
+```
+
+**Set production secrets:**
+```bash
+wrangler secret put JWT_SECRET --env production
 ```
 
 ## 📈 Monitoring and Analytics
@@ -296,7 +330,9 @@ The API provides comprehensive analytics:
    - Verify R2 public URL configuration
 
 3. **Authentication Problems**:
-   - Ensure JWT_SECRET is set and consistent
+   - Ensure JWT_SECRET is set as a Cloudflare secret: `wrangler secret list`
+   - Verify secrets are properly configured for each environment
+   - Check that JWT_SECRET is not accidentally stored in wrangler.toml (security risk)
    - Check token expiration settings
    - Verify admin user exists and is approved
 

@@ -6,14 +6,27 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
+    "deploy:preview": "wrangler deploy --env preview",
+    "deploy:production": "wrangler deploy --env production",
     "build": "wrangler deploy --dry-run",
     "test": "vitest",
     "test:watch": "vitest --watch",
-    "db:migrate": "wrangler d1 migrations apply design-gallery-db",
-    "db:migrate:local": "wrangler d1 migrations apply design-gallery-db --local",
-    "db:studio": "wrangler d1 studio design-gallery-db",
-    "db:studio:local": "wrangler d1 studio design-gallery-db --local",
+    "test:api": "./test-api.sh",
+    "setup:remote": "./setup-remote-testing.sh",
+    "db:migrate": "wrangler d1 migrations apply design-gallery-db --remote",
+    "db:migrate:preview": "wrangler d1 migrations apply design-gallery-db-preview --env preview --remote",
+    "db:migrate:production": "wrangler d1 migrations apply design-gallery-db-prod --env production --remote",
+    "db:studio": "wrangler d1 studio design-gallery-db --remote",
+    "db:studio:preview": "wrangler d1 studio design-gallery-db-preview --env preview --remote",
+    "db:studio:production": "wrangler d1 studio design-gallery-db-prod --env production --remote",
     "generate:migration": "wrangler d1 migrations create design-gallery-db",
+    "logs": "wrangler tail",
+    "logs:preview": "wrangler tail --env preview",
+    "logs:production": "wrangler tail --env production",
+    "secrets:list": "wrangler secret list",
+    "secrets:list:production": "wrangler secret list --env production",
+    "deployments": "wrangler deployments list",
+    "deployments:production": "wrangler deployments list --env production",
     "lint": "eslint src/",
     "format": "prettier --write src/"
   },
@@ -39,9 +52,10 @@
     "wrangler": "^3.28.0"
   },
   "dependencies": {
-    "hono": "^4.0.0",
+    "@hono/zod-validator": "^0.7.0",
     "bcryptjs": "^2.4.3",
+    "hono": "^4.0.0",
     "jose": "^5.2.0",
-    "zod": "^3.22.0"
+    "zod": "^3.25.76"
   }
-} 
+}

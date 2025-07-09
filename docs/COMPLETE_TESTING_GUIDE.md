@@ -67,30 +67,37 @@ name = "design-gallery-api"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
 
-[env.development]
-vars = { 
-  JWT_SECRET = "your-super-secret-jwt-key-change-in-production",
-  ENVIRONMENT = "development",
-  R2_PUBLIC_URL = "https://your-domain.com",  # You'll update this after R2 setup
-  CLOUDFLARE_ACCOUNT_ID = "your-account-id-here"
-}
+# Environment variables (non-sensitive only)
+[vars]
+ENVIRONMENT = "development"
+# JWT_SECRET is stored as a Cloudflare secret - not here!
+CORS_ORIGINS = "*"
+MAX_FILE_SIZE = "10485760"
+DEFAULT_PAGE_SIZE = "20"
+MAX_PAGE_SIZE = "100"
+R2_PUBLIC_URL = "https://pub-YOUR-ACCOUNT-ID.r2.dev"  # Replace with your actual R2 public URL
+CLOUDFLARE_ACCOUNT_ID = "your-cloudflare-account-id"  # Replace with your actual account ID
 
-[[env.development.d1_databases]]
+# D1 Database binding
+[[d1_databases]]
 binding = "DB"
 database_name = "design-gallery-db"
-database_id = "your-database-id-from-step-2.1"
+database_id = "your-d1-database-id"  # Replace with your actual database ID
 
-[[env.development.r2_buckets]]
+# R2 Storage binding
+[[r2_buckets]]
 binding = "R2_BUCKET"
-bucket_name = "design-gallery-images"
+bucket_name = "designs"
 
+# Production environment configuration
 [env.production]
 vars = { 
-  JWT_SECRET = "production-secret-key",
   ENVIRONMENT = "production",
-  R2_PUBLIC_URL = "https://your-production-domain.com",
-  CLOUDFLARE_ACCOUNT_ID = "your-account-id-here"
+  CORS_ORIGINS = "https://yourdomain.com",
+  R2_PUBLIC_URL = "https://your-production-r2-domain.com",
+  CLOUDFLARE_ACCOUNT_ID = "your-cloudflare-account-id"
 }
+# JWT_SECRET for production is stored as a Cloudflare secret
 
 [[env.production.d1_databases]]
 binding = "DB"
@@ -100,6 +107,19 @@ database_id = "your-production-database-id"
 [[env.production.r2_buckets]]
 binding = "R2_BUCKET"
 bucket_name = "design-gallery-images-prod"
+```
+
+## 🔐 **Important: Setting Up Secrets**
+
+**Never store sensitive values in wrangler.toml!** Instead, use Cloudflare secrets:
+
+```bash
+# Set JWT secret for each environment
+wrangler secret put JWT_SECRET
+wrangler secret put JWT_SECRET --env production
+
+# Verify secrets are set
+wrangler secret list
 ```
 
 ### 2.3 Run Database Migrations

@@ -9,6 +9,7 @@ import authRoutes from './routes/auth'
 import uploadRoutes from './routes/upload'
 import designRoutes from './routes/designs'
 import adminRoutes from './routes/admin'
+import cartRoutes from './routes/cart'
 
 // Import middleware
 import { rateLimiter } from './middleware/rateLimit'
@@ -31,10 +32,22 @@ app.use('*', cors({
 }))
 
 // Apply rate limiting (if enabled in environment)
-app.use('*', rateLimiter)
+app.use('*', async (c, next) => {
+  const limiter = await rateLimiter()
+  return limiter(c, next)
+})
 
 // Apply request logging
 app.use('*', requestLogger)
+
+// Simple test endpoint (no database dependency)
+app.get('/test', async (c) => {
+  return c.json({
+    success: true,
+    message: 'Worker is working!',
+    timestamp: new Date().toISOString()
+  })
+})
 
 // Health check endpoint
 app.get('/', async (c) => {
@@ -50,37 +63,43 @@ app.get('/', async (c) => {
       r2_storage: true,
       admin_panel: true,
       user_favorites: true,
-      search_and_filters: true
+      search_and_filters: true,
+      shopping_cart: true,
+      whatsapp_sharing: true
     }
   }, 'API is running successfully'))
 })
 
-// Health check for services
+// Health check for services (with better error handling)
 app.get('/health', async (c) => {
   try {
     const env = c.env
     
     // Test database connection
-    let dbStatus = 'healthy'
+    let dbStatus = 'unhealthy'
+    let dbError: string | null = null
     try {
       await env.DB.prepare('SELECT 1').first()
+      dbStatus = 'healthy'
     } catch (error) {
-      dbStatus = 'unhealthy'
+      dbError = error instanceof Error ? error.message : 'Unknown database error'
       console.error('Database health check failed:', error)
     }
     
     // Test R2 storage connection
-    let r2Status = 'healthy'
+    let r2Status = 'unhealthy'
+    let r2Error: string | null = null
     try {
       await env.R2_BUCKET.list({ limit: 1 })
+      r2Status = 'healthy'
     } catch (error) {
-      r2Status = 'unhealthy'
+      r2Error = error instanceof Error ? error.message : 'Unknown R2 error'
       console.error('R2 health check failed:', error)
     }
     
     const overallStatus = dbStatus === 'healthy' && r2Status === 'healthy' ? 'healthy' : 'degraded'
     
-    return c.json(ResponseUtils.success({
+    const healthData: any = {
       status: overallStatus,
       timestamp: new Date().toISOString(),
       services: {
@@ -88,11 +107,21 @@ app.get('/health', async (c) => {
         r2_storage: r2Status
       },
       environment: env.ENVIRONMENT || 'development'
-    }, 'Health check completed'))
+    }
+    
+    // Add error details if any
+    if (dbError || r2Error) {
+      healthData.errors = {}
+      if (dbError) healthData.errors.database = dbError
+      if (r2Error) healthData.errors.r2_storage = r2Error
+    }
+    
+    return c.json(ResponseUtils.success(healthData, 'Health check completed'))
     
   } catch (error) {
     console.error('Health check failed:', error)
-    return c.json(ResponseUtils.error('Health check failed'), 500)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    return c.json(ResponseUtils.error('Health check failed: ' + errorMessage), 500)
   }
 })
 
@@ -111,13 +140,16 @@ app.get('/info', async (c) => {
       admin_panel: 'Comprehensive admin controls for user and content management',
       user_favorites: 'Personal favorites system for users',
       search_and_filters: 'Advanced search and filtering capabilities',
+      shopping_cart: 'Shopping cart functionality for approved users',
+      whatsapp_sharing: 'WhatsApp sharing for selected designs',
       analytics: 'View counts, like counts, and engagement metrics'
     },
     endpoints: {
       auth: '/api/auth/*',
       designs: '/api/designs/*',
       upload: '/api/upload/*',
-      admin: '/api/admin/*'
+      admin: '/api/admin/*',
+      cart: '/api/cart/*'
     },
     documentation: {
       readme: 'See README.md for setup instructions',
@@ -133,6 +165,7 @@ app.route('/api/auth', authRoutes)
 app.route('/api/upload', uploadRoutes)
 app.route('/api/designs', designRoutes)
 app.route('/api/admin', adminRoutes)
+app.route('/api/cart', cartRoutes)
 
 // Global error handler
 app.onError((error, c) => {

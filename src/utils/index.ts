@@ -71,14 +71,59 @@ export class SecurityUtils {
   }
 
   /**
-   * Extract bearer token from Authorization header
-   */
-  static extractBearerToken(authHeader: string | null): string | null {
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return null
-    }
-    return authHeader.substring(7)
+ * Extract bearer token from Authorization header
+ */
+static extractBearerToken(authHeader: string | null): string | null {
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return null
   }
+  return authHeader.substring(7)
+}
+
+/**
+ * Generate design number from filename or create auto-generated one
+ */
+static generateDesignNumber(filename: string, category: string = 'general'): string {
+  // Extract design number from filename if it contains one
+  // Common patterns: "DGN-001.jpg", "SAR-123.png", "001-elegant-saree.jpg"
+  
+  // Pattern 1: Filename starts with design code (DGN-001, SAR-123, etc.)
+  const codePattern = /^([A-Z]{2,4}-\d{3,4})/i
+  const codeMatch = filename.match(codePattern)
+  if (codeMatch) {
+    return codeMatch[1].toUpperCase()
+  }
+  
+  // Pattern 2: Filename starts with numbers (001, 123, etc.)
+  const numberPattern = /^(\d{3,4})/
+  const numberMatch = filename.match(numberPattern)
+  if (numberMatch) {
+    const categoryPrefix = category.substring(0, 3).toUpperCase()
+    return `${categoryPrefix}-${numberMatch[1]}`
+  }
+  
+  // Pattern 3: Extract any number sequence from filename
+  const anyNumberPattern = /(\d{3,4})/
+  const anyNumberMatch = filename.match(anyNumberPattern)
+  if (anyNumberMatch) {
+    const categoryPrefix = category.substring(0, 3).toUpperCase()
+    return `${categoryPrefix}-${anyNumberMatch[1]}`
+  }
+  
+  // Fallback: Generate auto number with timestamp
+  const timestamp = Date.now().toString().slice(-4)
+  const categoryPrefix = category.substring(0, 3).toUpperCase()
+  return `${categoryPrefix}-${timestamp}`
+}
+
+/**
+ * Validate design number format
+ */
+static isValidDesignNumber(designNumber: string): boolean {
+  // Valid formats: DGN-001, SAR-123, LEH-456, etc.
+  const pattern = /^[A-Z]{2,4}-\d{3,4}$/
+  return pattern.test(designNumber)
+}
 }
 
 /**

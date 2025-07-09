@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { authMiddleware, adminMiddleware } from '../middleware/auth'
-import { ResponseUtils, ValidationUtils, getR2PublicUrl, r2FileExists } from '../utils'
+import { ResponseUtils, ValidationUtils, SecurityUtils, getR2PublicUrl, r2FileExists } from '../utils'
 import type { 
   Env, 
   DesignCreate, 
@@ -33,6 +33,7 @@ function formatDesignResponse(design: any, env: Env): DesignResponse {
     long_description: design.long_description,
     image_url: getR2PublicUrl(design.r2_object_key, env),
     r2_object_key: design.r2_object_key,
+    design_number: design.design_number, // Customer-facing design number
     category: design.category,
     style: design.style,
     colour: design.colour,
@@ -66,6 +67,7 @@ app.get('/', authMiddleware, async (c) => {
     const page = parseInt(c.req.query('page') || '1')
     const per_page = parseInt(c.req.query('per_page') || '20')
     const q = c.req.query('q')
+    const design_number = c.req.query('design_number') // Search by design number
     const category = c.req.query('category')
     const style = c.req.query('style')
     const colour = c.req.query('colour')
@@ -75,6 +77,8 @@ app.get('/', authMiddleware, async (c) => {
     const designer_name = c.req.query('designer_name')
     const collection_name = c.req.query('collection_name')
     const season = c.req.query('season')
+    const sort_by = c.req.query('sort_by') || 'created_at' // Default sort by creation date
+    const sort_order = c.req.query('sort_order') || 'desc' // Default descending order
     
     // Validate pagination
     const { page: validPage, limit: validLimit } = ValidationUtils.validatePagination(page, per_page, 100)
@@ -98,10 +102,17 @@ app.get('/', authMiddleware, async (c) => {
         long_description LIKE ? OR 
         tags LIKE ? OR
         designer_name LIKE ? OR
-        collection_name LIKE ?
+        collection_name LIKE ? OR
+        design_number LIKE ?
       )`)
       const searchTerm = `%${q}%`
-      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm)
+      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm)
+    }
+    
+    // Add design number filter
+    if (design_number) {
+      conditions.push('design_number = ?')
+      params.push(design_number)
     }
     
     // Add filters
@@ -140,11 +151,18 @@ app.get('/', authMiddleware, async (c) => {
     const total_pages = Math.ceil(total / validLimit)
     const offset = (validPage - 1) * validLimit
     
+    // Validate sort parameters
+    const allowedSortFields = ['created_at', 'title', 'view_count', 'like_count', 'design_number', 'category', 'style']
+    const allowedSortOrders = ['asc', 'desc']
+    
+    const validSortBy = allowedSortFields.includes(sort_by) ? sort_by : 'created_at'
+    const validSortOrder = allowedSortOrders.includes(sort_order.toLowerCase()) ? sort_order.toUpperCase() : 'DESC'
+    
     // Get designs
     const designsQuery = `
       SELECT * FROM designs 
       ${whereClause} 
-      ORDER BY created_at DESC 
+      ORDER BY ${validSortBy} ${validSortOrder} 
       LIMIT ? OFFSET ?
     `
     const designsResult = await env.DB.prepare(designsQuery)
@@ -246,83 +264,106 @@ app.get('/:id', authMiddleware, async (c) => {
   }
 })
 
-/**
- * Create a new design (admin only)
- * POST /designs
- */
-app.post('/', authMiddleware, adminMiddleware, async (c) => {
-  try {
-    const env = c.env
-    const user = c.get('user')
-    
-    const designData: DesignCreate = await c.req.json()
-    
-    // Validate required fields
-    if (!designData.title || !designData.r2_object_key || !designData.category) {
-      return c.json(ResponseUtils.error('Title, r2_object_key, and category are required'), 400)
-    }
-    
-    // Verify R2 object exists
-    const exists = await r2FileExists(env.R2_BUCKET, designData.r2_object_key)
-    if (!exists) {
-      return c.json(ResponseUtils.error('R2 object key not found'), 400)
-    }
-    
-    // Create design
-    const now = new Date().toISOString()
-    const insertQuery = `
-      INSERT INTO designs (
-        title, description, short_description, long_description,
-        r2_object_key, category, style, colour, fabric, occasion,
-        size_available, price_range, tags, featured, status,
-        view_count, like_count, designer_name, collection_name,
-        season, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `
-    
-    const result = await env.DB.prepare(insertQuery).bind(
-      designData.title,
-      designData.description || null,
-      designData.short_description || null,
-      designData.long_description || null,
-      designData.r2_object_key,
-      designData.category,
-      designData.style || null,
-      designData.colour || null,
-      designData.fabric || null,
-      designData.occasion || null,
-      designData.size_available || null,
-      designData.price_range || null,
-      designData.tags || null,
-      designData.featured ? 1 : 0,
-      'active',
-      0, // view_count
-      0, // like_count
-      designData.designer_name || null,
-      designData.collection_name || null,
-      designData.season || null,
-      now,
-      now
-    ).run()
-    
-    if (!result.success) {
+  /**
+   * Create a new design (admin only)
+   * POST /designs
+   */
+  app.post('/', authMiddleware, adminMiddleware, async (c) => {
+    try {
+      const env = c.env
+      const user = c.get('user')
+      
+      const designData: DesignCreate = await c.req.json()
+      
+      // Validate required fields
+      if (!designData.title || !designData.r2_object_key || !designData.category) {
+        return c.json(ResponseUtils.error('Title, r2_object_key, and category are required'), 400)
+      }
+      
+      // Verify R2 object exists
+      const exists = await r2FileExists(env.R2_BUCKET, designData.r2_object_key)
+      if (!exists) {
+        return c.json(ResponseUtils.error('R2 object key not found'), 400)
+      }
+      
+      // Generate design number if not provided
+      let designNumber = designData.design_number
+      if (!designNumber) {
+        // Extract filename from r2_object_key
+        const filename = designData.r2_object_key.split('/').pop() || ''
+        designNumber = SecurityUtils.generateDesignNumber(filename, designData.category)
+      }
+      
+      // Validate design number format
+      if (!SecurityUtils.isValidDesignNumber(designNumber)) {
+        return c.json(ResponseUtils.error('Invalid design number format. Use format like DGN-001, SAR-123'), 400)
+      }
+      
+      // Check if design number already exists
+      const existingDesign = await env.DB.prepare('SELECT id FROM designs WHERE design_number = ?')
+        .bind(designNumber)
+        .first()
+      
+      if (existingDesign) {
+        return c.json(ResponseUtils.error(`Design number ${designNumber} already exists`), 400)
+      }
+      
+      // Create design
+      const now = new Date().toISOString()
+      const insertQuery = `
+        INSERT INTO designs (
+          title, description, short_description, long_description,
+          r2_object_key, design_number, category, style, colour, fabric, occasion,
+          size_available, price_range, tags, featured, status,
+          view_count, like_count, designer_name, collection_name,
+          season, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `
+      
+      const result = await env.DB.prepare(insertQuery).bind(
+        designData.title,
+        designData.description || null,
+        designData.short_description || null,
+        designData.long_description || null,
+        designData.r2_object_key,
+        designNumber,
+        designData.category,
+        designData.style || null,
+        designData.colour || null,
+        designData.fabric || null,
+        designData.occasion || null,
+        designData.size_available || null,
+        designData.price_range || null,
+        designData.tags || null,
+        designData.featured ? 1 : 0,
+        'active',
+        0, // view_count
+        0, // like_count
+        designData.designer_name || null,
+        designData.collection_name || null,
+        designData.season || null,
+        now,
+        now
+      ).run()
+      
+      if (!result.success) {
+        return c.json(ResponseUtils.error('Failed to create design'), 500)
+      }
+      
+      // Get the created design
+      const createdDesign = await env.DB.prepare('SELECT * FROM designs WHERE id = ?')
+        .bind(result.meta.last_row_id)
+        .first()
+      
+      const response = formatDesignResponse(createdDesign, env)
+      
+      return c.json(ResponseUtils.success(response, 'Design created successfully'), 201)
+      
+    } catch (error) {
+      console.error('Create design error:', error)
       return c.json(ResponseUtils.error('Failed to create design'), 500)
     }
-    
-    // Get the created design
-    const createdDesign = await env.DB.prepare('SELECT * FROM designs WHERE id = ?')
-      .bind(result.meta.last_row_id)
-      .first()
-    
-    const response = formatDesignResponse(createdDesign, env)
-    
-    return c.json(ResponseUtils.success(response, 'Design created successfully'), 201)
-    
-  } catch (error) {
-    console.error('Create design error:', error)
-    return c.json(ResponseUtils.error('Failed to create design'), 500)
-  }
-})
+  })
 
 /**
  * Update a design (admin only)
