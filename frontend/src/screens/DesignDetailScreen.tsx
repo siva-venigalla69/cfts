@@ -1,30 +1,23 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator, ScrollView, Image, FlatList } from 'react-native';
+import { View, Text, ActivityIndicator, ScrollView, FlatList } from 'react-native';
 import { RouteProp, useRoute } from '@react-navigation/native';
 import { HomeStackParamList } from '../types';
 import { useDesignStore } from '../store/designStore';
-import { apiService } from '../services/api';
 import { DesignImage, Design } from '../types';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { AuthenticatedImage } from '../components/AuthenticatedImage';
 
 export default function DesignDetailScreen() {
   const route = useRoute<RouteProp<HomeStackParamList, 'DesignDetail'>>();
   const { designId } = route.params;
   const { currentDesign, isLoading, fetchDesign } = useDesignStore();
-  const [images, setImages] = useState<DesignImage[]>([]);
-  const [imgLoading, setImgLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     fetchDesign(designId).catch(() => setError('Failed to load design.'));
-    setImgLoading(true);
-    apiService.get<{ data: { images: DesignImage[] } }>(`/designs/${designId}/images`)
-      .then((res) => setImages(res.data.data.images))
-      .catch(() => setError('Failed to load images.'))
-      .finally(() => setImgLoading(false));
   }, [designId]);
 
-  if (isLoading || imgLoading) {
+  if (isLoading) {
     return <ActivityIndicator style={{ flex: 1 }} size="large" color="#6750A4" />;
   }
   if (error) {
@@ -34,36 +27,57 @@ export default function DesignDetailScreen() {
     return <Text style={{ textAlign: 'center', marginTop: 32 }}>Design not found.</Text>;
   }
 
-  // Use images array if present, else fallback to image_url
+  // Use images array from design response, fallback to single image_url
   let allImages: DesignImage[] = [];
-  if (images.length > 0) {
-    allImages = images;
-  } else if ((currentDesign as any).images && Array.isArray((currentDesign as any).images)) {
-    allImages = (currentDesign as any).images.map((img: any, idx: number) => ({
-      ...img,
-      id: img.id || idx,
-      image_url: img.image_url || currentDesign.image_url,
-    }));
+  if (currentDesign.images && currentDesign.images.length > 0) {
+    allImages = currentDesign.images;
   } else {
-    allImages = [{ id: 0, image_url: currentDesign.image_url } as DesignImage];
+    // Fallback to single image if no images array
+    allImages = [{ 
+      id: 0, 
+      design_id: currentDesign.id,
+      image_url: currentDesign.image_url,
+      r2_object_key: currentDesign.r2_object_key,
+      image_order: 0,
+      is_primary: true,
+      created_at: currentDesign.created_at,
+      updated_at: currentDesign.updated_at
+    } as DesignImage];
   }
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <ScrollView style={{ flex: 1, padding: 16 }}>
-        <Text style={{ fontWeight: 'bold', fontSize: 20 }}>{currentDesign.title}</Text>
-        <Text style={{ marginVertical: 8 }}>{currentDesign.long_description || currentDesign.description}</Text>
+        <Text style={{ fontWeight: 'bold', fontSize: 20, marginBottom: 8 }}>{currentDesign.title}</Text>
+        <Text style={{ marginVertical: 8, color: '#666', lineHeight: 20 }}>
+          {currentDesign.long_description || currentDesign.description}
+        </Text>
+        
+        {/* Design Details */}
+        <View style={{ marginVertical: 16, padding: 16, backgroundColor: '#f8f8f8', borderRadius: 8 }}>
+          <Text style={{ fontWeight: 'bold', marginBottom: 8 }}>Design Details</Text>
+          <Text>Category: {currentDesign.category}</Text>
+          <Text>Style: {currentDesign.style}</Text>
+          <Text>Color: {currentDesign.colour}</Text>
+          <Text>Fabric: {currentDesign.fabric}</Text>
+          <Text>Occasion: {currentDesign.occasion}</Text>
+          <Text>Price Range: {currentDesign.price_range}</Text>
+        </View>
+
+        {/* Images */}
+        <Text style={{ fontWeight: 'bold', fontSize: 16, marginBottom: 8 }}>Images</Text>
         <FlatList
           data={allImages}
           keyExtractor={item => item.id.toString()}
           horizontal
           showsHorizontalScrollIndicator={false}
-          style={{ marginVertical: 16 }}
+          style={{ marginVertical: 8 }}
           renderItem={({ item }) => (
-            <Image
-              source={{ uri: item.image_url }}
+            <AuthenticatedImage
+              imageUrl={item.image_url}
               style={{ width: 200, height: 200, marginRight: 12, borderRadius: 8, backgroundColor: '#eee' }}
               resizeMode="cover"
+              onError={(error) => console.log('Image load error:', error)}
             />
           )}
           ListEmptyComponent={<Text>No images found.</Text>}

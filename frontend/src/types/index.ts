@@ -33,6 +33,7 @@ export interface Design {
   short_description?: string;
   long_description?: string;
   image_url: string;
+  images?: DesignImage[]; // Add images array from backend
   r2_object_key: string;
   design_number: string;
   category: string;

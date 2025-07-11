@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, Image, TextInput, StyleSheet, Dimensions, ScrollView } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, TextInput, StyleSheet, Dimensions, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { HomeStackParamList } from '../types';
@@ -7,6 +7,8 @@ import { useDesignStore } from '../store/designStore';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card, useTheme, Chip, IconButton } from 'react-native-paper';
 import { Picker } from '@react-native-picker/picker';
+import { AuthenticatedImage } from '../components/AuthenticatedImage';
+import { apiService } from '../services/api';
 
 const categories = [
   '', 'sarees', 'lehenga', 'kurta', 'gown', 'salwar', 'other'
@@ -17,7 +19,7 @@ const sortOptions = [
   { label: 'Price: Low to High', value: 'price_asc' },
   { label: 'Price: High to Low', value: 'price_desc' },
 ];
-const fallbackImage = 'https://via.placeholder.com/300x300?text=No+Image';
+const fallbackImage = 'https://via.placeholder.com/300x300/6750A4/FFFFFF?text=Design+Image';
 const numColumns = 2;
 const CARD_MARGIN = 8;
 const CARD_WIDTH = (Dimensions.get('window').width - (numColumns + 1) * CARD_MARGIN) / numColumns;
@@ -55,11 +57,16 @@ export default function HomeScreen() {
     >
       <Card style={styles.card}>
         <View style={{ borderRadius: 16, overflow: 'hidden' }}>
-          <Image
-            source={{ uri: item.image_url || fallbackImage }}
+          <AuthenticatedImage
+            imageUrl={item.image_url || fallbackImage}
             style={styles.image}
             resizeMode="cover"
-            onError={() => {}}
+            onError={(error) => {
+              console.log('Image load error for:', item.title, 'URL:', item.image_url, 'Error:', error);
+            }}
+            onLoad={() => {
+              console.log('Image loaded successfully for:', item.title, 'URL:', item.image_url);
+            }}
           />
         </View>
         <View style={styles.cardContent}>

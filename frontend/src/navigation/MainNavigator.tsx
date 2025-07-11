@@ -21,7 +21,7 @@ function HomeStackNavigator() {
       <HomeStack.Screen name="DesignList" component={HomeScreen} options={{ title: 'Design Gallery' }} />
       <HomeStack.Screen name="DesignDetail" component={DesignDetailScreen} options={{ title: 'Design Details' }} />
     </HomeStack.Navigator>
-  );
+);
 }
 
 export default function MainNavigator() {

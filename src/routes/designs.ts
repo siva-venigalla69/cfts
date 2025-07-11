@@ -34,7 +34,7 @@ function formatDesignResponse(design: any, env: Env, images: DesignImageResponse
     description: design.description,
     short_description: design.short_description,
     long_description: design.long_description,
-    image_url: getR2PublicUrl(design.r2_object_key, env),
+          image_url: getR2PublicUrl(design.r2_object_key, env),
     images: images,
     r2_object_key: design.r2_object_key,
     design_number: design.design_number, // Customer-facing design number

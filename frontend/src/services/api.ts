@@ -59,7 +59,7 @@ class ApiService {
   }
 
   // Token management (these will be implemented with AsyncStorage)
-  private getStoredToken(): string | null {
+  public getStoredToken(): string | null {
     // This will be implemented with AsyncStorage in the store
     return null;
   }
@@ -224,6 +224,13 @@ class ApiService {
   // Generic GET method for custom endpoints
   public get<T = any>(url: string) {
     return this.api.get<T>(url);
+  }
+
+
+
+  // Get base URL for authenticated image URLs
+  public getBaseUrl(): string {
+    return this.api.defaults.baseURL || '';
   }
 }
 

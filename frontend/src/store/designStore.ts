@@ -68,8 +68,12 @@ export const useDesignStore = create<DesignState>((set, get) => ({
         filters
       });
 
+      console.log('API Response:', JSON.stringify(response.data, null, 2));
+
       // Fix: extract designs and pagination from response.data.data
       const { designs, ...pagination } = response.data.data as any;
+
+      console.log('Extracted designs:', designs?.length, 'Designs:', designs?.map((d: any) => ({ id: d.id, title: d.title, image_url: d.image_url })));
 
       set((state) => ({
         designs: isFirstPage ? designs : [...state.designs, ...designs],
@@ -80,6 +84,7 @@ export const useDesignStore = create<DesignState>((set, get) => ({
         isLoadingMore: false,
       }));
     } catch (error) {
+      console.error('Fetch designs error:', error);
       set({ isLoading: false, isLoadingMore: false });
       throw error;
     }
@@ -107,13 +112,17 @@ export const useDesignStore = create<DesignState>((set, get) => ({
       set({ isLoading: true });
       
       const response = await apiService.getDesign(id);
+      console.log('Design API Response:', JSON.stringify(response.data, null, 2));
+      
       const design = response.data.data!;
+      console.log('Extracted design:', { id: design.id, title: design.title, image_url: design.image_url, images_count: design.images?.length });
 
       set({
         currentDesign: design,
         isLoading: false,
       });
     } catch (error) {
+      console.error('Fetch design error:', error);
       set({ isLoading: false });
       throw error;
     }
